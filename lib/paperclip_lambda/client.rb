@@ -8,7 +8,7 @@ module PaperclipLambda
       @location = avatar.path
       @bucket   = avatar.options[:s3_credentials][:bucket]
 
-      lambda    = ::Aws::Lambda::Client.new(access_key_id: avatar.options[:s3_credentials][:access_key_id], secret_access_key: avatar.options[:s3_credentials][:secret_access_key], region: avatar.options[:s3_region])
+      lambda = ::Aws::Lambda::Client.new
       lambda.invoke(function_name: function_name, payload: request_body.to_json, invocation_type: "Event")
     rescue ::Aws::Lambda::Errors::ServiceError => e
       @errors = e
