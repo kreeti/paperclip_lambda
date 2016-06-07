@@ -9,8 +9,7 @@ Gem::Specification.new do |s|
   s.description = "Process your uploaded image through aws lambda"
   s.authors     = ["Santanu Bhattacharya"]
   s.email       = 'sbhattacharya@kreeti.com'
-  s.files       = ["lib", "lib/paperclip_lambda.rb", "lib/paperclip_lambda/client.rb"]
-  s.require_paths = ["lib"]
+  s.files       = `git ls-files`.split("\n")
   s.homepage    = 'http://rubygems.org/gems/paperclip_lambda'
-  s.license       = 'MIT'
+  s.license     = 'MIT'
 end
