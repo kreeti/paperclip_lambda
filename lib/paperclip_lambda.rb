@@ -6,16 +6,21 @@ module PaperclipLambda
   class << self
     def options
       @options ||= {
-        function_name: nil
+        function_name: nil,
+        rotator: nil
       }
     end
 
     def invoke_client(obj, attachment_name)
       avatar = obj.send(attachment_name)
-      lambda_options = obj.class.name.constantize.paperclip_definitions[attachment_name][:lambda]
-      return nil unless avatar.options[:s3_credentials]
+      rotate_attr = obj.class.name.constantize.paperclip_definitions[attachment_name][:lambda][:rotator]
 
-      PaperclipLambda::Client.new(obj.send(lambda_options[:function_name]), avatar)
+      lambda_options = {
+        function_name: obj.class.name.constantize.paperclip_definitions[attachment_name][:lambda][:function_name],
+        degree: obj.send(rotate_attr)
+      }
+
+      PaperclipLambda::Client.new(lambda_options, avatar)
     end
   end
 
@@ -27,9 +32,16 @@ module PaperclipLambda
   end
 
   module ClassMethods
-    def process_in_lambda(name, function_name)
+    def process_in_lambda(name, function_name, options = { })
       paperclip_definitions[name][:lambda] = { }
       paperclip_definitions[name][:lambda][:function_name] = function_name
+
+      {
+        rotator: PaperclipLambda.options[:rotator]
+      }.each do |option, default|
+        paperclip_definitions[name][:lambda][option] = options.key?(option) ? options[option] : default
+      end
+
 
       if respond_to?(:after_commit)
         after_commit :process_lambda
