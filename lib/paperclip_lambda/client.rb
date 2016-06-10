@@ -9,7 +9,7 @@ module PaperclipLambda
       @bucket   = lambda_options[:bucket]
       @degree = lambda_options[:degree]
       @destroy = lambda_options[:destroy]
-      binding.pry
+
       lambda = ::Aws::Lambda::Client.new
       lambda.invoke(function_name: lambda_options[:function_name], payload: request_body.to_json, invocation_type: "Event")
     rescue ::Aws::Lambda::Errors::ServiceError => e
