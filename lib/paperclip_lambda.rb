@@ -11,16 +11,19 @@ module PaperclipLambda
       }
     end
 
-    def invoke_client(obj, attachment_name)
+    def invoke_client(obj, attachment_name, destroy = false)
       avatar = obj.send(attachment_name)
       rotate_attr = obj.class.name.constantize.paperclip_definitions[attachment_name][:lambda][:rotator]
 
       lambda_options = {
         function_name: obj.class.name.constantize.paperclip_definitions[attachment_name][:lambda][:function_name],
-        degree: obj.send(rotate_attr)
+        degree: (rotate_attr && obj.respond_to?(rotate_attr)) ? obj.send(rotate_attr) : 0,
+        location: avatar.path,
+        bucket: avatar.options[:bucket],
+        destroy: destroy
       }
 
-      PaperclipLambda::Client.new(lambda_options, avatar)
+      PaperclipLambda::Client.new(lambda_options)
     end
   end
 
@@ -41,7 +44,6 @@ module PaperclipLambda
       }.each do |option, default|
         paperclip_definitions[name][:lambda][option] = options.key?(option) ? options[option] : default
       end
-
 
       if respond_to?(:after_commit)
         after_commit :process_lambda
@@ -67,7 +69,15 @@ module PaperclipLambda
     end
 
     def enqueue_post_processing_for(name)
-      PaperclipLambda.invoke_client(self, name)
+      if attachment_changed = previous_changes[:image_updated_at] && attachment_changed.first.present?
+        PaperclipLambda.invoke_client(self, name, previous_changes[:image_file_name].first)
+      else
+        PaperclipLambda.invoke_client(self, name)
+      end
+    end
+
+    def enqueue_delete_processing_for(name)
+      PaperclipLambda.invoke_client(self, name, true)
     end
 
     def prepare_enqueueing_for(name)

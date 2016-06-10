@@ -4,10 +4,11 @@ module PaperclipLambda
   class Client
     attr_reader :errors
 
-    def initialize(lambda_options, avatar)
-      @location = avatar.path
-      @bucket   = avatar.options[:bucket]
+    def initialize(lambda_options)
+      @location = lambda_options[:location]
+      @bucket   = lambda_options[:bucket]
       @degree = lambda_options[:degree]
+      @destroy = lambda_options[:destroy]
 
       lambda = ::Aws::Lambda::Client.new
       lambda.invoke(function_name: lambda_options[:function_name], payload: request_body.to_json, invocation_type: "Event")
@@ -21,7 +22,8 @@ module PaperclipLambda
           name: @bucket
         },
         location: @location,
-        rotation: @degree
+        rotation: @degree,
+        destroy: @destroy
       }
     end
   end
