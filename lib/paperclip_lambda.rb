@@ -69,8 +69,10 @@ module PaperclipLambda
     end
 
     def enqueue_post_processing_for(name)
-      if attachment_changed = previous_changes[:image_updated_at] && attachment_changed.first.present?
-        PaperclipLambda.invoke_client(self, name, previous_changes[:image_file_name].first)
+      attachment_changed = previous_changes[name.to_s + "_updated_at"]
+
+      if attachment_changed.first.present?
+        PaperclipLambda.invoke_client(self, name, previous_changes[name.to_s + "_file_name"].first)
       else
         PaperclipLambda.invoke_client(self, name)
       end
