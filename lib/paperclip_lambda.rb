@@ -7,20 +7,20 @@ module PaperclipLambda
     def options
       @options ||= {
         function_name: nil,
-        rotator: nil
+        processor: [:rotation]
       }
     end
 
     def invoke_client(obj, attachment_name, destroy = false)
       avatar = obj.send(attachment_name)
-      rotate_attr = obj.class.name.constantize.paperclip_definitions[attachment_name][:lambda][:rotator]
+      rotate_attr = obj.class.name.constantize.paperclip_definitions[attachment_name][:lambda][:rotation]
 
       lambda_options = {
         function_name: obj.class.name.constantize.paperclip_definitions[attachment_name][:lambda][:function_name],
         degree: (rotate_attr && obj.respond_to?(rotate_attr)) ? obj.send(rotate_attr) : 0,
         location: avatar.path,
-        bucket: avatar.options[:bucket],
-        destroy: destroy
+        delete_location: destroy,
+        bucket: avatar.options[:bucket]
       }
 
       PaperclipLambda::Client.new(lambda_options)
@@ -39,10 +39,8 @@ module PaperclipLambda
       paperclip_definitions[name][:lambda] = { }
       paperclip_definitions[name][:lambda][:function_name] = function_name
 
-      {
-        rotator: PaperclipLambda.options[:rotator]
-      }.each do |option, default|
-        paperclip_definitions[name][:lambda][option] = options.key?(option) ? options[option] : default
+      PaperclipLambda.options[:processor].each do |option|
+        paperclip_definitions[name][:lambda][option] = option if options[:processor].include?(option)
       end
 
       if respond_to?(:after_commit)
@@ -65,26 +63,43 @@ module PaperclipLambda
         enqueue_post_processing_for(name)
       end
 
+      (@_attachment_for_lambda_deleting || []).each_with_index do |name, index|
+        enqueue_delete_processing_for(name, @_attachment_deleting_path[index])
+      end
+
       @_attachment_for_lambda_processing = []
+      @_attachment_for_lambda_deleting = []
+      @_attachment_deleting_path = []
     end
 
     def enqueue_post_processing_for(name)
       attachment_changed = previous_changes[name.to_s + "_updated_at"]
 
-      if attachment_changed.first.present?
-        PaperclipLambda.invoke_client(self, name, previous_changes[name.to_s + "_file_name"].first)
+      if attachment_changed && attachment_changed.first.present?
+        path = send(name).path.split('/')
+        delete_path = path.tap(&:pop).concat([previous_changes[name.to_s + "_file_name"].first]).join('/')
+
+        PaperclipLambda.invoke_client(self, name, delete_path)
       else
         PaperclipLambda.invoke_client(self, name)
       end
     end
 
-    def enqueue_delete_processing_for(name)
-      PaperclipLambda.invoke_client(self, name, true)
+    def enqueue_delete_processing_for(name, delete_path)
+      PaperclipLambda.invoke_client(self, name, delete_path)
     end
 
     def prepare_enqueueing_for(name)
       @_attachment_for_lambda_processing ||= []
       @_attachment_for_lambda_processing << name
+    end
+
+    def prepare_deleting_for(name)
+      @_attachment_for_lambda_deleting ||= []
+      @_attachment_for_lambda_deleting << name
+
+      @_attachment_deleting_path ||= []
+      @_attachment_deleting_path << send(name).path
     end
   end
 end

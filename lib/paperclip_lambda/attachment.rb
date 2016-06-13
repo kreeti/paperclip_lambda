@@ -21,7 +21,7 @@ module PaperclipLambda
       end
 
       def destroy_with_lambda
-        instance.enqueue_delete_processing_for(name)
+        instance.prepare_deleting_for(name)
       end
     end
   end

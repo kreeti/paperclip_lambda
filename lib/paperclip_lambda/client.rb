@@ -8,7 +8,7 @@ module PaperclipLambda
       @location = lambda_options[:location]
       @bucket   = lambda_options[:bucket]
       @degree = lambda_options[:degree]
-      @destroy = lambda_options[:destroy]
+      @delete_location = lambda_options[:delete_location]
 
       lambda = ::Aws::Lambda::Client.new
       lambda.invoke(function_name: lambda_options[:function_name], payload: request_body.to_json, invocation_type: "Event")
@@ -23,7 +23,7 @@ module PaperclipLambda
         },
         location: @location,
         rotation: @degree,
-        destroy: @destroy
+        delete_location: @delete_location
       }
     end
   end
