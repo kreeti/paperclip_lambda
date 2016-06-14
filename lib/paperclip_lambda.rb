@@ -4,7 +4,7 @@ require 'paperclip_lambda/railtie' if defined?(Rails)
 
 module PaperclipLambda
   class << self
-    def invoke_client(obj, attachment_name, destroy = false)
+    def invoke_client(obj, attachment_name, destroy = nil)
       avatar = obj.send(attachment_name)
       attribute_hash = { }
 
@@ -15,11 +15,12 @@ module PaperclipLambda
       lambda_options = {
         function_name: obj.class.name.constantize.paperclip_definitions[attachment_name][:lambda][:function_name],
         location: avatar.path,
-        delete_location: destroy,
-        bucket: avatar.options[:bucket]
+        destroy: destroy,
+        bucket: avatar.options[:bucket],
+        attributes: attribute_hash
       }
 
-      PaperclipLambda::Client.new(lambda_options, attribute_hash)
+      PaperclipLambda::Client.new(lambda_options)
     end
   end
 
@@ -34,7 +35,7 @@ module PaperclipLambda
     def process_in_lambda(name, function_name, options = { })
       paperclip_definitions[name][:lambda] = { }
       paperclip_definitions[name][:lambda][:function_name] = function_name
-      paperclip_definitions[name][:lambda][:attributes] = options[:attributes]
+      paperclip_definitions[name][:lambda][:attributes] = options[:attributes] || []
 
       if respond_to?(:after_commit)
         after_commit :process_lambda
@@ -71,17 +72,17 @@ module PaperclipLambda
 
       if attachment_changed && attachment_changed.first.present?
         path = send(name).path.split('/')
-        delete_path = path.tap(&:pop).concat([previous_changes[name.to_s + "_file_name"].first]).join('/')
+        path = path.tap(&:pop).concat([previous_changes[name.to_s + "_file_name"].first]).join('/')
 
-        PaperclipLambda.invoke_client(self, name, delete_path)
+        PaperclipLambda.invoke_client(self, name, path)
       else
         PaperclipLambda.invoke_client(self, name)
       end
     end
 
-    def enqueue_delete_processing_for(name_and_delete_path)
-      name, delete_path = name_and_delete_path
-      PaperclipLambda.invoke_client(self, name, delete_path)
+    def enqueue_delete_processing_for(name_and_path)
+      name, path = name_and_path
+      PaperclipLambda.invoke_client(self, name, path)
     end
 
     def prepare_enqueueing_for(name)
