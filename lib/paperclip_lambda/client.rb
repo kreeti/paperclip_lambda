@@ -4,10 +4,10 @@ module PaperclipLambda
   class Client
     attr_reader :errors
 
-    def initialize(lambda_options)
+    def initialize(lambda_options, attribute_hash)
       @location = lambda_options[:location]
       @bucket   = lambda_options[:bucket]
-      @degree = lambda_options[:degree]
+      @attribute_hash = attribute_hash
       @delete_location = lambda_options[:delete_location]
 
       lambda = ::Aws::Lambda::Client.new
@@ -22,9 +22,8 @@ module PaperclipLambda
           name: @bucket
         },
         location: @location,
-        rotation: @degree,
         delete_location: @delete_location
-      }
+      }.merge(@attribute_hash)
     end
   end
 end
