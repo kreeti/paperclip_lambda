@@ -58,7 +58,7 @@ module PaperclipLambda
 
       (@_attachment_for_lambda_deleting || []).each do |name_and_path|
         unless name_and_path.blank?
-          enqueue_delete_processing_for(name_and_path.first, name_and_path.last)
+          enqueue_delete_processing_for(name_and_path)
         end
       end
 
@@ -79,7 +79,8 @@ module PaperclipLambda
       end
     end
 
-    def enqueue_delete_processing_for(name, delete_path)
+    def enqueue_delete_processing_for(name_and_delete_path)
+      name, delete_path = name_and_delete_path
       PaperclipLambda.invoke_client(self, name, delete_path)
     end
 
