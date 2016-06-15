@@ -4,7 +4,7 @@ require 'paperclip_lambda/railtie' if defined?(Rails)
 
 module PaperclipLambda
   class << self
-    def invoke_client(obj, attachment_name, destroy = nil)
+    def invoke_client(obj, attachment_name, old_path = nil)
       avatar = obj.send(attachment_name)
       attribute_hash = { }
 
@@ -14,8 +14,8 @@ module PaperclipLambda
 
       lambda_options = {
         function_name: obj.class.name.constantize.paperclip_definitions[attachment_name][:lambda][:function_name],
-        location: avatar.path,
-        destroy: destroy,
+        path: avatar.path,
+        old_path: old_path,
         bucket: avatar.options[:bucket],
         attributes: attribute_hash
       }
@@ -69,20 +69,20 @@ module PaperclipLambda
 
     def enqueue_post_processing_for(name)
       attachment_changed = previous_changes[name.to_s + "_updated_at"]
+      file_array = previous_changes[name.to_s + "_file_name"]
 
-      if attachment_changed && attachment_changed.first.present?
-        path = send(name).path.split('/')
-        path = path.tap(&:pop).concat([previous_changes[name.to_s + "_file_name"].first]).join('/')
-
-        PaperclipLambda.invoke_client(self, name, path)
+      if attachment_changed && attachment_changed.first.present? && (file_array.uniq.length == file_array.length)
+        old_path = send(name).path.split('/')
+        old_path = old_path.tap(&:pop).concat([file_array.first]).join('/')
+        PaperclipLambda.invoke_client(self, name, old_path)
       else
         PaperclipLambda.invoke_client(self, name)
       end
     end
 
     def enqueue_delete_processing_for(name_and_path)
-      name, path = name_and_path
-      PaperclipLambda.invoke_client(self, name, path)
+      name, old_path = name_and_path
+      PaperclipLambda.invoke_client(self, name, old_path)
     end
 
     def prepare_enqueueing_for(name)

@@ -5,10 +5,10 @@ module PaperclipLambda
     attr_reader :errors
 
     def initialize(lambda_options)
-      @location = lambda_options[:location]
+      @path = lambda_options[:path]
       @bucket   = lambda_options[:bucket]
       @attributes = lambda_options[:attributes]
-      @to_delete = lambda_options[:destroy]
+      @old_path = lambda_options[:old_path]
 
       lambda = ::Aws::Lambda::Client.new
       lambda.invoke(function_name: lambda_options[:function_name], payload: request_body.to_json, invocation_type: "Event")
@@ -21,8 +21,8 @@ module PaperclipLambda
         bucket: {
           name: @bucket
         },
-        location: @location,
-        to_delete: @to_delete,
+        path: @path,
+        old_path: @old_path,
         attributes: @attributes
       }
     end
