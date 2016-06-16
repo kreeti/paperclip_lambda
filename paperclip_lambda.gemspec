@@ -6,7 +6,7 @@ Gem::Specification.new do |s|
   s.date        = '2016-06-03'
   s.summary     = "Paperclip Lambda"
   s.add_runtime_dependency "aws-sdk"
-  s.description = "Process your uploaded image through aws lambda"
+  s.description = "Process your uploaded images through aws lambda"
   s.authors     = ["Santanu Bhattacharya"]
   s.email       = 'sbhattacharya@kreeti.com'
   s.files       = `git ls-files`.split("\n")

@@ -4,23 +4,8 @@ require 'paperclip_lambda/railtie' if defined?(Rails)
 
 module PaperclipLambda
   class << self
-    def invoke_client(obj, attachment_name, old_path = nil)
-      avatar = obj.send(attachment_name)
-      attribute_hash = { }
-
-      obj.class.name.constantize.paperclip_definitions[attachment_name][:lambda][:attributes].each do |attribute|
-        attribute_hash[attribute] = obj.send(attribute) if obj.respond_to?(attribute)
-      end
-
-      lambda_options = {
-        function_name: obj.class.name.constantize.paperclip_definitions[attachment_name][:lambda][:function_name],
-        path: avatar.path,
-        old_path: old_path,
-        bucket: avatar.options[:bucket],
-        attributes: attribute_hash
-      }
-
-      PaperclipLambda::Client.new(lambda_options)
+    def process_delete_in_lambda(attachment_name, options = {})
+      PaperclipLambda::Client.new(paperclip_definitions[attachment_name][:lambda][:function_name], options)
     end
   end
 
@@ -38,9 +23,9 @@ module PaperclipLambda
       paperclip_definitions[name][:lambda][:attributes] = options[:attributes] || []
 
       if respond_to?(:after_commit)
-        after_commit :process_lambda
+        after_commit :enqueue_lambda_processing
       else
-        after_save :process_lambda
+        after_save :enqueue_lambda_processing
       end
     end
 
@@ -52,7 +37,9 @@ module PaperclipLambda
   end
 
   module InstanceMethods
-    def process_lambda
+    def enqueue_lambda_processing
+      mark_enqueue_lambda_processing
+
       (@_attachment_for_lambda_processing || []).each do |name|
         enqueue_post_processing_for(name)
       end
@@ -67,6 +54,14 @@ module PaperclipLambda
       @_attachment_for_lambda_deleting = []
     end
 
+    def mark_enqueue_lambda_processing
+      unless @_attachment_for_lambda_processing.blank? # catches nil and empty arrays
+        updates = @_attachment_for_lambda_processing.collect{|n| "#{n}_processing = :true" }.join(", ")
+        updates = ActiveRecord::Base.send(:sanitize_sql_array, [updates, {:true => true}])
+        self.class.where(:id => id).update_all(updates)
+      end
+    end
+
     def enqueue_post_processing_for(name)
       attachment_changed = previous_changes[name.to_s + "_updated_at"]
       file_array = previous_changes[name.to_s + "_file_name"]
@@ -74,15 +69,15 @@ module PaperclipLambda
       if attachment_changed && attachment_changed.first.present? && (file_array.uniq.length == file_array.length)
         old_path = send(name).path.split('/')
         old_path = old_path.tap(&:pop).concat([file_array.first]).join('/')
-        PaperclipLambda.invoke_client(self, name, old_path)
+        PaperclipLambda::LambdaJob.perform(obj.class, obj.id, name, { old_path: old_path })
       else
-        PaperclipLambda.invoke_client(self, name)
+        PaperclipLambda::LambdaJob.perform(obj.class, obj.id, name)
       end
     end
 
     def enqueue_delete_processing_for(name_and_path)
       name, old_path = name_and_path
-      PaperclipLambda.invoke_client(self, name, old_path)
+      PaperclipLambda::LambdaJob.perform(obj.class, obj.id, name, { bucket: send(name).options[:bucket], old_path: path })
     end
 
     def prepare_enqueueing_for(name)
@@ -90,7 +85,7 @@ module PaperclipLambda
       @_attachment_for_lambda_processing << name
     end
 
-    def prepare_deleting_for(name)
+    def prepare_enqueueing_for_deletion(name)
       @_attachment_for_lambda_deleting ||= []
       @_attachment_for_lambda_deleting << [name, send(name).path]
     end

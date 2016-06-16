@@ -20,8 +20,31 @@ module PaperclipLambda
         end
       end
 
+      def process_update_in_lambda(options = {})
+        lambda_definitions = instance.class.paperclip_definitions[name][:lambda]
+        attributes_hash = { }
+
+        lambda_definitions[:attributes].each do |attribute|
+          attributes_hash[attribute] = instance.send(attribute)
+        end
+
+        payload = {
+          path: path,
+          old_path: options[:old_path],
+          bucket: avatar.options[:bucket],
+          attributes: attributes_hash
+        }
+
+        PaperclipLambda::Client.new(lambda_definitions[:function_name], payload)
+
+        if instance.respond_to?(:"#{name}_processing?")
+          instance.send("#{name}_processing=", false)
+          instance.class.where(instance.class.primary_key => instance.id).update_all({ "#{name}_processing" => false })
+        end
+      end
+
       def destroy_with_lambda
-        instance.prepare_deleting_for(name)
+        instance.prepare_enqueueing_for_deletion(name)
       end
     end
   end
