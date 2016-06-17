@@ -1,11 +1,12 @@
 require 'paperclip_lambda/client'
 require 'paperclip_lambda/attachment'
+require 'paperclip_lambda/lambda_job'
 require 'paperclip_lambda/railtie' if defined?(Rails)
 
 module PaperclipLambda
   class << self
-    def process_delete_in_lambda(attachment_name, options = {})
-      PaperclipLambda::Client.new(paperclip_definitions[attachment_name][:lambda][:function_name], options)
+    def process_delete_in_lambda(klass, attachment_name, options = {})
+      PaperclipLambda::Client.new(klass.name.constantize.paperclip_definitions[attachment_name][:lambda][:function_name], options)
     end
   end
 
@@ -69,15 +70,15 @@ module PaperclipLambda
       if attachment_changed && attachment_changed.first.present? && (file_array.uniq.length == file_array.length)
         old_path = send(name).path.split('/')
         old_path = old_path.tap(&:pop).concat([file_array.first]).join('/')
-        PaperclipLambda::LambdaJob.perform(obj.class, obj.id, name, { old_path: old_path })
+        PaperclipLambda::LambdaJob.perform(self.class, self.id, name, { old_path: old_path })
       else
-        PaperclipLambda::LambdaJob.perform(obj.class, obj.id, name)
+        PaperclipLambda::LambdaJob.perform(self.class, self.id, name)
       end
     end
 
     def enqueue_delete_processing_for(name_and_path)
       name, old_path = name_and_path
-      PaperclipLambda::LambdaJob.perform(obj.class, obj.id, name, { bucket: send(name).options[:bucket], old_path: path })
+      PaperclipLambda::LambdaJob.perform(self.class, self.id, name, { bucket: send(name).options[:bucket], old_path: old_path })
     end
 
     def prepare_enqueueing_for(name)

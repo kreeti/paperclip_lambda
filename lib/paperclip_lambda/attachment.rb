@@ -31,7 +31,7 @@ module PaperclipLambda
         payload = {
           path: path,
           old_path: options[:old_path],
-          bucket: avatar.options[:bucket],
+          bucket: instance.send(name).options[:bucket],
           attributes: attributes_hash
         }
 
