@@ -5,8 +5,11 @@ module PaperclipLambda
       base.send(:alias_method, :save_without_lambda, :save)
       base.send(:alias_method, :save, :save_with_lambda)
 
-      base.send(:alias_method, :destroy_without_lambda, :destroy)
-      base.send(:alias_method, :destroy, :destroy_with_lambda)
+
+      base.send(:alias_method, :queue_all_for_delete_without_lambda, :queue_all_for_delete)
+      base.send(:alias_method, :queue_all_for_delete, :queue_all_for_delete_with_lambda)
+#      base.send(:alias_method, :destroy_without_lambda, :destroy)
+ #     base.send(:alias_method, :destroy, :destroy_with_lambda)
     end
 
     module InstanceMethods
@@ -43,8 +46,9 @@ module PaperclipLambda
         end
       end
 
-      def destroy_with_lambda
+      def queue_all_for_delete_with_lambda
         instance.prepare_enqueueing_for_deletion(name)
+        queue_all_for_delete_without_lambda
       end
     end
   end
