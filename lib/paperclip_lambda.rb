@@ -76,6 +76,7 @@ module PaperclipLambda
 
     def enqueue_delete_processing_for(name_and_path)
       name, old_path = name_and_path
+      return if persisted?
       PaperclipLambda::LambdaJob.perform_later(self.class.name, id, name.to_s, { bucket: send(name).options[:bucket], old_path: old_path })
     end
 
